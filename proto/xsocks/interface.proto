@@ -1,0 +1,8 @@
+syntax = "proto3";
+package interface;
+
+option go_package = "github.com/hlhgogo/xsocks-go/proto/xsocks";
+
+service XSocks {
+
+}
