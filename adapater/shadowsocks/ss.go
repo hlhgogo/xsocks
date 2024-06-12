@@ -105,7 +105,7 @@ func (s *ss) RunUDP() error {
 	if err != nil {
 		return fmt.Errorf("ListenPacket error: %s", err)
 	}
-	s.udpPackageConn = ciph.PacketConn(s.udpPackageConn)
+
 	localAddr := "0.0.0.0"
 
 	s.udpPackageConn = WrapPacketConn(s.udpPackageConn, s.Stat)
