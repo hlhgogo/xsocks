@@ -16,6 +16,8 @@ protobuf:
 
 .PHONY: spctl
 spctl:
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o output/spctl_darwin_amd64 ./spctl
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o output/spctl_darwin_arm64 ./spctl
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o output/spctl_linux_amd64 ./spctl
 	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o output/spctl_linux_arm64 ./spctl
 
