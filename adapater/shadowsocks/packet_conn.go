@@ -100,8 +100,14 @@ func timedCopy(dst net.PacketConn, target net.Addr, src net.PacketConn, timeout 
 	}
 }
 
-func handlePacketConn(ctx context.Context, ciphPc net.PacketConn, bindAddr string) {
+func handlePacketConn(ctx context.Context, ciphPc net.PacketConn, bindAddr string, opts ...SSOptionHandler) {
 	defer ciphPc.Close()
+
+	opt := &SSOption{}
+	for _, opth := range opts {
+		opth(opt)
+	}
+
 	t, _ := time.ParseDuration(defaultTimeout)
 	nm := newNATmap(t)
 
@@ -139,6 +145,7 @@ func handlePacketConn(ctx context.Context, ciphPc net.PacketConn, bindAddr strin
 			}
 			payload := buf[len(tgtAddr):n]
 			pc := nm.Get(raddr.String())
+
 			if pc == nil {
 				if bindAddr == "" {
 					pc, err = net.ListenPacket("udp", "")
@@ -152,7 +159,16 @@ func handlePacketConn(ctx context.Context, ciphPc net.PacketConn, bindAddr strin
 
 				var rpc net.PacketConn
 
-				rpc = pc
+				if opt.EnableTrafficControl {
+					rpc = &UDPConnWithTC{
+						PacketConn: pc,
+						OpFlag:     OpRateLimit,
+						TxBucket:   opt.TxBucket,
+						RxBucket:   opt.RxBucket,
+					}
+				} else {
+					rpc = pc
+				}
 
 				nm.Add(raddr, ciphPc, rpc, remoteServer)
 			}

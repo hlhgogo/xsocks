@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/hlhgogo/xsocks-go/adapater/shadowsocks"
 	"github.com/spf13/cobra"
+	"log"
 )
 
 var (
@@ -17,7 +18,19 @@ var createSessCmd = &cobra.Command{
 }
 
 func createSession(cmd *cobra.Command, args []string) {
-	shadowsocks.StartSs(*method, *password, *port)
+
+	ss := shadowsocks.NewSS(*port, *method, *password)
+	if err := ss.RunTcp(); err != nil {
+		panic(err)
+	}
+
+	if err := ss.RunUDP(); err != nil {
+		panic(err)
+	}
+
+	log.Printf("Start shadowsocks [%s|%s|%d]", *method, *password, port)
+
+	select {}
 }
 
 func init() {

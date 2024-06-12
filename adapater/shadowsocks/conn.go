@@ -1,9 +1,6 @@
 package shadowsocks
 
 import (
-	"context"
-	"fmt"
-	"github.com/shadowsocks/go-shadowsocks2/core"
 	"github.com/shadowsocks/go-shadowsocks2/socks"
 	"io"
 	"log"
@@ -48,8 +45,14 @@ func relay(left, right net.Conn) (int64, int64, error) {
 	return n, rs.N, err
 }
 
-func handleConn(conn net.Conn) error {
+func handleConn(conn net.Conn, opts ...SSOptionHandler) error {
 	defer conn.Close()
+
+	opt := &SSOption{}
+	for _, o := range opts {
+		o(opt)
+	}
+
 	tgt, err := socks.ReadAddr(conn)
 	if err != nil {
 		return err
@@ -67,7 +70,17 @@ func handleConn(conn net.Conn) error {
 	// rc.SetKeepAlive(true)
 
 	var remoteConn net.Conn
-	remoteConn = rc
+
+	if opt.EnableTrafficControl && opt.RxBucket != nil && opt.TxBucket != nil {
+		remoteConn = &ConnCustom{
+			Conn:     rc,
+			OpFlag:   OpRateLimit,
+			TxBucket: opt.TxBucket,
+			RxBucket: opt.RxBucket,
+		}
+	} else {
+		remoteConn = rc
+	}
 
 	_, _, err = relay(conn, remoteConn)
 	if err != nil {
@@ -78,75 +91,4 @@ func handleConn(conn net.Conn) error {
 		return err
 	}
 	return nil
-}
-
-func runTcp(method, password string, port int) error {
-
-	ciph, err := core.PickCipher(method, []byte{}, password)
-	if err != nil {
-		log.Printf("Create SS on port [%d] failed: %s", port, err)
-		return err
-	}
-
-	addr := fmt.Sprintf(":%d", port)
-	tcpConn, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Printf("failed to listen on %s : %v", addr, err)
-		return err
-	}
-
-	go func() {
-		for {
-			c, err := tcpConn.Accept()
-			if err != nil {
-				log.Printf("failed to accept: %v", err)
-				continue
-			}
-			c.(*net.TCPConn).SetKeepAlive(true)
-			go func() {
-				c = ciph.StreamConn(c)
-				err = handleConn(c)
-			}()
-		}
-	}()
-
-	//log.Printf("listening TCP on %s", addr)
-	return nil
-}
-
-func runUDP(method, password string, port int) error {
-	var err error
-	ciph, err := core.PickCipher(method, []byte{}, password)
-	if err != nil {
-		log.Printf("Create SS on port [%d] failed: %s", port, err)
-		return err
-	}
-	addr := fmt.Sprintf(":%d", port)
-	udpPackageConn, err := net.ListenPacket("udp", addr)
-	if err != nil {
-		log.Printf("UDP remote listen error: %v", err)
-		return err
-	}
-	udpPackageConn = ciph.PacketConn(udpPackageConn)
-	localAddr := "0.0.0.0"
-
-	go handlePacketConn(context.TODO(), udpPackageConn, localAddr)
-
-	return nil
-}
-
-func StartSs(method, password string, port int) {
-
-	err := runTcp(method, password, port)
-	if err != nil {
-		panic(err)
-	}
-
-	err = runUDP(method, password, port)
-	if err != nil {
-		panic(err)
-	}
-
-	log.Printf("Start shadowsocks [%s|%s|%d]", method, password, port)
-	select {}
 }
