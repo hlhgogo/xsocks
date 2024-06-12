@@ -75,6 +75,7 @@ func (s *ss) RunTcp() error {
 			}
 			c.(*net.TCPConn).SetKeepAlive(true)
 			go func() {
+				c = WrapConn(c, s.Stat)
 				c = ciph.StreamConn(c)
 
 				opts := []SSOptionHandler{}
